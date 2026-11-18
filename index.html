@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#29353c"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Superstar SDR"><meta name="description" content="SUPERSTAR SDR mobile : mémoires HF, accord et ouverture d'un récepteur KiwiSDR public.">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="assets/icon-180.png"><link rel="icon" href="assets/icon-192.png"><link rel="stylesheet" href="style.css">
+<title>SUPERSTAR SDR · Mobile</title>
+</head>
+<body>
+<main class="app">
+<header><div><small>RADIO HF • COMPAGNON MOBILE</small><h1>SUPERSTAR <span>SDR</span></h1></div><span class="edition">MOBILE 1.0</span></header>
+<section class="face" aria-label="Façade radio">
+<div class="screens"><div class="smeter"><span>S 0</span><small>S-MÈTRE : SUR LE KIWI</small></div><div class="freq"><strong id="frequency" aria-live="polite">7.15000</strong><span>MHz · <b id="modeLabel">LSB</b> · PRÉRÉGLAGE</span></div></div>
+<div class="knobs"><div><div class="knob"></div><span>VOLUME*</span></div><div><div class="knob"></div><span>SQUELCH*</span></div><div><div class="knob"></div><span>ACCORD</span></div></div>
+</section>
+<p class="tip">* Volume et squelch sont réglés directement dans le récepteur KiwiSDR ouvert par « ÉCOUTER ».</p>
+<section class="panel"><div class="head"><h2>Bandes radioamateurs</h2><span>ÉCOUTE PUBLIQUE</span></div><div id="bands" class="bands" role="group" aria-label="Bandes radio"></div><label class="field">Modulation <select id="mode"><option>LSB</option><option>USB</option><option>AM</option><option>NFM</option></select></label><div class="tuning"><button data-step="-1000">−1 kHz</button><button data-step="-100">−100 Hz</button><button data-step="-10">−10 Hz</button><button data-step="10">+10 Hz</button><button data-step="100">+100 Hz</button><button data-step="1000">+1 kHz</button></div><div class="field"><label for="manualFrequency">Fréquence en MHz</label><div class="inline"><input type="number" id="manualFrequency" min="0.01" max="30" step="0.00001" inputmode="decimal"><button id="apply">ACCORDER</button></div></div></section>
+<section class="panel"><h2>Récepteur KiwiSDR</h2><label class="field" for="server">Adresse du récepteur public</label><input id="server" type="text" spellcheck="false" autocomplete="off" placeholder="http://serveur:8073/"><p class="subtle">Le récepteur annoncé couvre 0–30 MHz. L'accès et le son dépendent de sa disponibilité.</p><button class="listen" id="listen">▶ ÉCOUTER SUR KIWI</button><p class="subtle">Ouvre le KiwiSDR dans un onglet Safari, à la fréquence et dans le mode choisis. Cette page ne lit pas elle-même l'audio.</p></section>
+<section class="panel"><div class="head"><h2>Mémoires</h2><button id="save" class="mini">+ MÉMORISER</button></div><div id="memoryList" class="memories"></div><p class="subtle">Enregistrées sur cet iPhone uniquement.</p></section>
+<section class="panel future"><h2>Scan automatique</h2><p>Le scan audio intégré n'est pas disponible dans cette première version Web. Il nécessite un moteur KiwiSDR compatible Safari, pas simplement GitHub Pages.</p><button disabled>SCAN AUDIO • EN DÉVELOPPEMENT</button></section>
+<footer><span id="status" role="status">Prêt · aucune connexion audio locale</span><small>SUPERSTAR SDR Mobile · compagnon KiwiSDR indépendant</small></footer>
+</main>
+<script src="app.js" defer></script>
+</body></html>
