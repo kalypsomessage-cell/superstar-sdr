@@ -56,8 +56,38 @@ $('volume').oninput=()=>{settings.volume=Number($('volume').value);radio.setVolu
 $('squelch').value=settings.squelch;$('squelchValue').textContent=settings.squelch+' dBFS';
 $('squelch').oninput=()=>{settings.squelch=Number($('squelch').value);radio.setSquelch(settings.squelch);$('squelchValue').textContent=settings.squelch+' dBFS';persist()};
 radio.setVolume(settings.volume/100);radio.setSquelch(settings.squelch);
-$('relay').value=settings.relay||'';radio.setRelay(settings.relay||'');$('relay').onchange=()=>{const value=$('relay').value.trim();if(value&&!SuperstarKiwi.audioRelayUrl(value,1234)){status('Relais invalide : URL HTTPS obligatoire');return}settings.relay=value;radio.setRelay(value);persist();status(value?'Relais enregistré':'Relais désactivé')};$('diag').onclick=async()=>{const value=$('relay').value.trim();if(!value){$('relayStatus').textContent='Aucun relais renseigné';return}let url;try{url=new URL(value);if(url.protocol!=='https:')throw Error('HTTPS requis');url.pathname='/health';const r=await fetch(url.href,{cache:'no-store'});const j=await r.json();$('relayStatus').textContent=r.ok&&j.service==='superstar-kiwi-relay'?'Relais en ligne (la connexion Kiwi reste à tester)':`Relais en erreur HTTP ${r.status}`}catch(e){$('relayStatus').textContent='Relais inaccessible : '+e.message}};$('server').value=settings.server;$('server').onchange=()=>{if(SuperstarKiwi.parseServer($('server').value)){settings.server=$('server').value.trim();persist()}else status('Adresse serveur invalide')};
-$('connect').onclick=async()=>{const server=SuperstarKiwi.parseServer($('server').value);if(!server){status('Adresse KiwiSDR invalide');return}settings.server=server.href;radio.setRelay(settings.relay||'');persist();scanStop('Préparation du moteur audio');$('connect').disabled=true;try{await radio.connect(settings.server,settings.hz,settings.mode)}catch(e){status('Erreur moteur audio : '+(e.message||String(e)));$('connect').disabled=false}};
+$('relay').value=settings.relay||'';
+radio.setRelay(settings.relay||'');
+function saveRelay(){
+ const value=$('relay').value.trim();
+ if(value&&!SuperstarKiwi.audioRelayUrl(value,1234)){
+  $('relayStatus').textContent='Adresse invalide : HTTPS requis';return false;
+ }
+ settings.relay=value;radio.setRelay(value);persist();return true;
+}
+$('relay').addEventListener('change',saveRelay);
+$('relay').addEventListener('input',()=>{$('relayStatus').textContent='Adresse modifiée : cliquez sur VÉRIFIER LE RELAIS';});
+async function checkRelay(){
+ const button=$('diag'), display=$('relayStatus');
+ if(!saveRelay())return;
+ const value=settings.relay;
+ if(!value){display.textContent='Aucun relais renseigné';return;}
+ button.disabled=true;button.textContent='VÉRIFICATION EN COURS…';
+ display.textContent='Connexion au relais Cloudflare en cours…';
+ const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),10000);
+ try{
+  const url=new URL('/health',value.endsWith('/')?value:value+'/');
+  const response=await fetch(url.href,{cache:'no-store',signal:controller.signal});
+  const data=await response.json();
+  display.textContent=response.ok&&data.service==='superstar-kiwi-relay'
+   ?'Relais Cloudflare accessible ✓ — flux audio KiwiSDR non encore vérifié'
+   :`Réponse inattendue du relais (HTTP ${response.status})`;
+ }catch(error){display.textContent='Échec du test : '+(error.name==='AbortError'?'délai de 10 secondes dépassé':error.message);}
+ finally{clearTimeout(timeout);button.disabled=false;button.textContent='VÉRIFIER LE RELAIS';}
+}
+$('diag').addEventListener('click',checkRelay);
+$('server').value=settings.server;$('server').onchange=()=>{if(SuperstarKiwi.parseServer($('server').value)){settings.server=$('server').value.trim();persist()}else status('Adresse serveur invalide')};
+$('connect').onclick=async()=>{if(!saveRelay())return;const server=SuperstarKiwi.parseServer($('server').value);if(!server){status('Adresse KiwiSDR invalide');return}settings.server=server.href;radio.setRelay(settings.relay||'');persist();scanStop('Préparation du moteur audio');$('connect').disabled=true;try{await radio.connect(settings.server,settings.hz,settings.mode)}catch(e){status('Erreur moteur audio : '+(e.message||String(e)));$('connect').disabled=false}};
 $('disconnect').onclick=()=>{radio.disconnect();scanStop('Arrêt manuel');};
 function range(start,end,step,mode,name){const out=[];for(let hz=start;hz<=end;hz+=step)out.push({hz,mode,name});return out}
 const SCAN_SETS={

@@ -1,0 +1,6 @@
+SUPERSTAR SDR V2.2 - Diagnostic du relais
+
+Publier les fichiers web a la racine du depot GitHub (ne pas publier le dossier RELAIS_CLOUDFLARE).
+La V2.2 enregistre le relais au clic, affiche une progression, un resultat et un delai maximum de 10 secondes.
+Le test /health ne garantit pas le transport audio.
+Ne pas supprimer les autres fichiers et icones deja presents dans le depot.
