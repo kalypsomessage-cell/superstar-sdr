@@ -7,15 +7,16 @@ const BANDS=[
 {id:'15m',label:'15 m',hz:21300000,mode:'usb',start:21200000,end:21450000},
 {id:'12m',label:'12 m',hz:24950000,mode:'usb',start:24930000,end:24990000},
 {id:'10m',label:'10 m',hz:28500000,mode:'usb',start:28300000,end:29000000}];
-const KEY='superstar-mobile-v1', DEFAULT='http://22859.proxy.kiwisdr.com:8073/';
+const KEY='superstar-mobile-v1', DEFAULT='http://22859.proxy.kiwisdr.com:8073/', DEFAULT_RELAY='https://superstar-sdr-relay.kalypso-message.workers.dev';
 const $=id=>document.getElementById(id);
 const format=hz=>(hz/1e6).toFixed(5);
 const safeHz=hz=>Number.isFinite(hz)&&hz>=10000&&hz<=30000000;
-let settings={hz:7150000,mode:'lsb',band:'40m',server:DEFAULT,relay:'',volume:70,squelch:-105,memories:[]};
+let settings={hz:7150000,mode:'lsb',band:'40m',server:DEFAULT,relay:DEFAULT_RELAY,volume:70,squelch:-105,memories:[]};
 try{const saved=JSON.parse(localStorage.getItem(KEY)||'{}');if(saved&&typeof saved==='object')settings={...settings,...saved}}catch(_){}
 if(!safeHz(settings.hz))settings.hz=7150000;
 if(!['am','lsb','usb','nbfm','nfm'].includes(settings.mode))settings.mode='lsb';
 if(!SuperstarKiwi.parseServer(settings.server))settings.server=DEFAULT;
+if(!settings.relay || !SuperstarKiwi.audioRelayUrl(settings.relay,1234))settings.relay=DEFAULT_RELAY;
 if(!Array.isArray(settings.memories))settings.memories=[];
 settings.memories=settings.memories.filter(m=>safeHz(m.hz)&&['am','lsb','usb','nbfm','nfm'].includes(m.mode)).slice(0,120);
 const radio=new SuperstarKiwi.KiwiAudio({state:onRadioState,meter:onMeter,tuned:()=>{syncDisplay();},});
@@ -152,4 +153,4 @@ $('embed').onclick=()=>{const url=externalLink();if(!url)return;const u=new URL(
 $('closeEmbed').onclick=()=>{$('kiwiFrame').src='about:blank';$('embedView').hidden=true};
 window.addEventListener('pagehide',()=>radio.disconnect(false));
 syncDisplay();renderMemories();connection('HORS LIGNE · appuyez sur ÉCOUTER ICI');
-if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('./sw.js?v=25', {updateViaCache:'none'}).catch(()=>{});
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('./sw.js?v=25fix2', {updateViaCache:'none'}).catch(()=>{});
