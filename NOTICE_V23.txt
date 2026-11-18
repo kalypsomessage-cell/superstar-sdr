@@ -1,0 +1,4 @@
+SUPERSTAR SDR V2.3 — scan avec arrêt sur activité et reprise automatique après 5 secondes sans signal (ou 90 secondes maximum).
+Le niveau audio est un indicateur imparfait : bruit, parasites et variations de propagation peuvent provoquer des arrêts ou des ratés.
+Aucune modification du moteur kiwi-audio.js ni du Worker Cloudflare.
+Test sur iPhone indispensable avant validation définitive.

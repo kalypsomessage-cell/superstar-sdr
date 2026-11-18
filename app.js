@@ -41,9 +41,27 @@ function onRadioState(state,detail){liveMode=state;radioConnected=state==='audio
  syncDisplay();if(state==='audio')$('connect').disabled=false}
 function onMeter({smeter,level,frames,rate}){lastDb=level;$('frames').textContent=`${frames} trame${frames>1?'s':''} audio`;$('audioRate').textContent=`${Math.round(rate)} Hz`;$('signal').textContent=`${Math.round(smeter)} dBm`;
  const s=Math.max(0,Math.min(9,Math.round((smeter+121)/6)));$('smeter').textContent=`S ${s}`;$('meterInfo').textContent=`${Math.round(level)} dBFS · RADIO`;
- if(scan&&scan.state==='running'&&Date.now()-scan.startAt>500&&frames>scan.lastFrames){const floor=scan.floor;const diff=level-floor;if(diff>10&&level>-70)scan.hits++;else scan.hits=0;
-   scan.floor=Math.min(level,floor+0.25);scan.lastFrames=frames;
-   if(scan.hits>=3){const f=format(settings.hz);const type=scan.name;scan.state='paused';clearTimeout(scan.timer);$('resumeScan').disabled=false;$('pauseScan').disabled=true;status(`Activité détectée sur ${f} MHz · ${type} · à écouter`);$('scanInfo').textContent=`Arrêt sur activité : ${f} MHz. Ne garantit pas une conversation française.`}}
+ if(scan && frames>scan.lastFrames){
+   const now=Date.now(), active=Number.isFinite(level)&&level>scan.threshold;
+   scan.lastFrames=frames;
+   if(scan.state==='running' && now-scan.startAt>=650){
+     scan.hits=active?scan.hits+1:0;
+     if(scan.hits>=4){
+       scan.state='listening';clearTimeout(scan.timer);
+       scan.lastActivity=now;scan.listenStart=now;
+       $('resumeScan').disabled=false;$('pauseScan').disabled=true;
+       status(`Signal détecté sur ${format(settings.hz)} MHz · écoute en cours`);
+       $('scanInfo').textContent=`Écoute du signal · reprise automatique après 5 s de silence (max. 90 s)`;
+     }
+   }else if(scan.state==='listening'){
+     if(active)scan.lastActivity=now;
+     if(now-scan.lastActivity>=5000 || now-scan.listenStart>=90000){
+       scan.state='running';$('pauseScan').disabled=false;$('resumeScan').disabled=true;
+       status('Fin d’activité · reprise du balayage');scanStep();
+     }
+   }
+ }
+
 }
 for(const b of BANDS){const button=document.createElement('button');button.textContent=b.label;button.dataset.band=b.id;button.onclick=()=>{changeMode(b.mode);tune(b.hz,b.id)};$('bands').append(button)}
 $('mode').onchange=()=>changeMode($('mode').value);
@@ -96,13 +114,13 @@ const SCAN_SETS={
 };
 function startScan(name){if(!radio.audioStarted||!radio.ws||radio.ws.readyState!==WebSocket.OPEN){status('SCAN INDISPONIBLE : attendre de vraies trames audio KiwiSDR');return}
  scanStop('Nouveau balayage');let list=name==='fr'?SCAN_SETS.fr:name==='qso'?SCAN_SETS.qso:(()=>{const b=BANDS.find(b=>b.id===settings.band)||BANDS[1];return range(b.start,b.end,2500,b.mode,b.label)})();
- scan={name,list,index:0, timer:null,state:'running',floor:-85,lastFrames:radio.audioFrames,startAt:Date.now(),hits:0};$('stopScan').disabled=false;$('pauseScan').disabled=false;$('resumeScan').disabled=true;scanStep()}
+ scan={name,list,index:0,timer:null,state:'running',threshold:-67,lastFrames:radio.audioFrames,startAt:Date.now(),hits:0,lastActivity:0,listenStart:0};$('stopScan').disabled=false;$('pauseScan').disabled=false;$('resumeScan').disabled=true;scanStep()}
 function scanStep(){if(!scan||scan.state!=='running')return;const s=scan;const next=s.list[s.index%s.list.length];s.index++;
  if(!radio.tune(next.hz,next.mode)){scanStop('Scan stoppé : accord refusé');return}
- settings.hz=next.hz;settings.mode=next.mode;settings.band=BANDS.find(b=>next.hz>=b.start&&next.hz<=b.end)?.id||null;syncDisplay();s.hits=0;s.floor=Math.min(-55,Math.max(-95,lastDb-3));s.startAt=Date.now();s.lastFrames=radio.audioFrames;status(`SCAN ${s.name.toUpperCase()} · ${format(next.hz)} MHz ${next.mode.toUpperCase()}`);$('scanInfo').textContent=`Recherche d’activité : ${next.name} · ${s.index}/${s.list.length} positions`;s.timer=setTimeout(scanStep,1800)}
+ settings.hz=next.hz;settings.mode=next.mode;settings.band=BANDS.find(b=>next.hz>=b.start&&next.hz<=b.end)?.id||null;syncDisplay();s.hits=0;s.threshold=Math.max(-77,Math.min(-54,lastDb+9));s.startAt=Date.now();s.lastFrames=radio.audioFrames;status(`SCAN ${s.name.toUpperCase()} · ${format(next.hz)} MHz ${next.mode.toUpperCase()}`);$('scanInfo').textContent=`Recherche d’activité : ${next.name} · ${s.index}/${s.list.length} positions`;s.timer=setTimeout(scanStep,1800)}
 $('scanFR').onclick=()=>startScan('fr');$('scanQSO').onclick=()=>startScan('qso');$('scanBand').onclick=()=>startScan('band');
-$('pauseScan').onclick=()=>{if(!scan||scan.state!=='running')return;scan.state='paused';clearTimeout(scan.timer);$('pauseScan').disabled=true;$('resumeScan').disabled=false;status('Balayage en pause')};
-$('resumeScan').onclick=()=>{if(!scan||scan.state!=='paused')return;scan.state='running';$('pauseScan').disabled=false;$('resumeScan').disabled=true;scanStep()};
+$('pauseScan').onclick=()=>{if(!scan||!['running','listening'].includes(scan.state))return;scan.state='paused';clearTimeout(scan.timer);$('pauseScan').disabled=true;$('resumeScan').disabled=false;status('Balayage en pause')};
+$('resumeScan').onclick=()=>{if(!scan||!['paused','listening'].includes(scan.state))return;scan.state='running';$('pauseScan').disabled=false;$('resumeScan').disabled=true;scanStep()};
 $('stopScan').onclick=()=>scanStop();
 function renderMemories(){const parent=$('memoryList');parent.replaceChildren();if(settings.memories.length===0){const p=document.createElement('p');p.className='subtle';p.textContent='Aucune mémoire enregistrée.';parent.appendChild(p);return}
  settings.memories.forEach((mem,index)=>{const row=document.createElement('div');row.className='memory';const body=document.createElement('div');body.className='memText';const strong=document.createElement('strong');strong.textContent=`${format(mem.hz)} MHz · ${mem.mode.toUpperCase()}`;const small=document.createElement('small');small.textContent=mem.server||'';body.append(strong,small);const recall=document.createElement('button');recall.textContent='RAPPEL';recall.onclick=()=>{if(scan)scanStop('Scan arrêté');if(mem.server){settings.server=mem.server;$('server').value=mem.server}changeMode(mem.mode==='nfm'?'nbfm':mem.mode);tune(mem.hz);status('Mémoire rappelée : '+format(mem.hz)+' MHz')};const del=document.createElement('button');del.textContent='×';del.setAttribute('aria-label','Supprimer cette mémoire');del.onclick=()=>{settings.memories.splice(index,1);persist();renderMemories()};row.append(body,recall,del);parent.append(row)})}
