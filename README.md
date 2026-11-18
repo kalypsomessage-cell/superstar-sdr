@@ -1,1 +1,1 @@
-SUPERSTAR SDR V3.1 Silver — façade directement en haut, bandeau de titre supprimé, version dans Réglages. Audio et Worker inchangés. Décompresser puis envoyer les fichiers sur GitHub Pages.
+SUPERSTAR SDR V3.1.1 : correction façade coupée sur iPhone. Désactivation sticky et restauration du scroll, façade complète. Worker Cloudflare inchangé. Publier les fichiers du ZIP sur GitHub Pages.

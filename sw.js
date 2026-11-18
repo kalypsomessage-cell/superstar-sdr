@@ -1,5 +1,5 @@
 'use strict';
-const CACHE='superstar-mobile-v31-headerless-20261118';
+const CACHE='superstar-mobile-v311-ios-top-20261118';
 const CORE=['./','./index.html','./app.js','./kiwi-audio.js','./style.css','./manifest.webmanifest','./superstar360-silver.png',];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('superstar-mobile-')&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));

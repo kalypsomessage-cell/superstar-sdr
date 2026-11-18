@@ -238,3 +238,9 @@ showCb();
  let initial='hf';try{initial=sessionStorage.getItem('superstar-page')||'hf'}catch(_){}
  activate(initial);
 })();
+
+// Fix restoration de position iOS : revenir au début lors du lancement.
+try{if('scrollRestoration' in history)history.scrollRestoration='manual'}catch(_){}
+function superstarResetScroll(){window.scrollTo(0,0);document.documentElement.scrollTop=0;document.body.scrollTop=0;}
+superstarResetScroll();
+window.addEventListener('pageshow',()=>{superstarResetScroll();requestAnimationFrame(superstarResetScroll)});
