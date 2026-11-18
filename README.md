@@ -1,27 +1,32 @@
-# SUPERSTAR SDR Mobile — compagnon KiwiSDR
+# SUPERSTAR SDR Mobile V2 — édition expérimentale
 
-Cette édition **GitHub Pages / iPhone** est une première version web. Elle inclut :
+Version iPhone / Safari / GitHub Pages, indépendante du programme Windows.
 
-- façade aluminium responsive et installable sur l'écran d'accueil iPhone (PWA) ;
-- préréglages des bandes 80, 40, 20, 17, 15, 12 et 10 m ;
-- réglage de fréquence par pas de 1 kHz, 100 Hz et 10 Hz ;
-- modes AM, USB, LSB, NFM ;
-- mémoires locales persistantes (localStorage) ;
-- lien « ÉCOUTER SUR KIWI » vers le récepteur Web à la fréquence choisie.
+## Fonctions
 
-**Limitation importante :** l'audio et les commandes de volume/squelch restent dans la page du récepteur KiwiSDR. Aucun scan audio automatique n'est encore porté sur iOS. GitHub Pages ne peut pas exécuter le logiciel Python/Tkinter/KiwiClient Windows. Le récepteur distant peut être indisponible ou interdire les connexions.
+- Nouveau moteur JavaScript direct KiwiSDR : tentative WSS, handshake, démodulation distante, PCM/IMA ADPCM, AudioContext Safari, volume et squelch local. Il ne nécessite pas de Python ni de serveur de relais.
+- Fréquences en MHz à cinq décimales, correctes sur petit écran iPhone. Accord fin 10/100/1000 Hz.
+- Mémoires persistantes et migration automatique du stockage de la V1.
+- Scan HF activable **uniquement après réception effective de trames audio**. Détection d'activité, pas de voix ni de langue française.
+- Affichage interne de la page KiwiSDR à titre de repli **uniquement si le serveur autorise le chargement en iframe et HTTPS**.
+- Accès externe de secours pour les récepteurs HTTP qui ne permettent pas WSS.
 
-## Publication sur GitHub Pages
+## Limite fondamentale
 
-1. Sur le dépôt `kalypsomessage-cell/superstar-sdr`, cliquer sur **Add file** > **Upload files**.
-2. Déposer **le contenu de ce dossier**, pas le ZIP ni le dossier parent. `index.html` doit être à la racine du dépôt.
-3. Valider **Commit changes**.
-4. **Settings > Pages > Build and deployment > Deploy from a branch** ; sélectionner **main** et **/(root)** puis **Save**.
-5. Ouvrir l'adresse `https://kalypsomessage-cell.github.io/superstar-sdr/` une fois le déploiement effectué.
-6. Sur iPhone : Safari > Partager > **Sur l'écran d'accueil**.
+Le site GitHub Pages est servi en HTTPS. Les navigateurs modernes interdisent les WebSocket non sécurisés `ws://` et l'intégration en iframe de `http://` à l'intérieur de HTTPS. Le récepteur `http://22859.proxy.kiwisdr.com:8073/`, fonctionnel dans Safari seul, **n'a pas été confirmé accessible en WSS**. L'audio direct V2 et le scanner sont donc **expérimentaux** et ne peuvent être déclarés fonctionnels sur cet hôte avant test sur iPhone. Le programme n'affiche « trames audio reçues » que lorsqu'il en reçoit réellement.
 
-Aucune modification du dépôt `mon-radar-emploi` n'est nécessaire.
+Un service HTTPS/WSS autorisé par l'exploitant du KiwiSDR pourrait être requis pour la compatibilité complète. GitHub Pages ne peut servir de relais websocket lui-même.
 
-## Notes techniques
+## Publication GitHub
 
-Le lien vers Kiwi utilise le paramètre de fréquence documenté `?f=7150lsb` (fréquence en kHz suivie du mode). Les commandes d'accord dans SUPERSTAR SDR Mobile **préparent ce lien** ; elles ne pilotent pas en direct une session audio Safari. Le serveur prérempli est celui utilisé lors des essais Windows : `http://22859.proxy.kiwisdr.com:8073/` ; sa disponibilité n'est pas garantie.
+Décompressez l'archive et téléversez **les fichiers et le dossier assets** à la racine du dépôt `kalypsomessage-cell/superstar-sdr`, en remplaçant les anciens fichiers lorsqu'ils portent le même nom. Le nouveau fichier `kiwi-audio.js` doit impérativement être téléversé.
+
+La V1 reste disponible dans GitHub (historique des commits) pour revenir en arrière.
+
+## Autotests
+
+`node --check kiwi-audio.js && node --check app.js && node --check sw.js`
+
+`node tests/smoke.test.js`
+
+Ces tests couvrent la syntaxe, la construction de l'URL WSS, les limites des fréquences et le format des commandes DSP. Ils ne simulent pas un serveur radio distant réel.
