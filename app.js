@@ -29,9 +29,10 @@ function syncDisplay(){
  if(!manualEditing)$('manualFrequency').value=format(settings.hz).replace('.',',');
  $('displayState').textContent=liveMode==='audio'?'ÉCOUTE':liveMode==='socket'?'EN ATTENTE':'PRÉRÉGLAGE';
  for(const btn of $('bands').children)btn.classList.toggle('active',btn.dataset.band===settings.band);
- persist()
+ persist();updateScanPanel(scan?(scan.state==='running'?'BALAYAGE':scan.state==='listening'?'ÉCOUTE':'PAUSE'):'PRÊT')
 }
-function scanStop(message='Scan arrêté'){if(scan){clearTimeout(scan.timer);scan=null}for(const id of ['pauseScan','resumeScan','stopScan'])$(id).disabled=true;status(message);$('scanInfo').textContent='Détection d’activité radio, pas de reconnaissance de voix ou de langue.'}
+function scanStop(message='Scan arrêté'){if(scan){clearTimeout(scan.timer);scan=null}for(const id of ['pauseScan','resumeScan','stopScan'])$(id).disabled=true;status(message);$('scanInfo').textContent='Détection d’activité radio, pas de reconnaissance de voix ou de langue.';updateScanPanel('ARRÊTÉ')}
+function updateScanPanel(state){if($('scanFrequency'))$('scanFrequency').textContent=format(settings.hz)+' MHz · '+settings.mode.toUpperCase();if($('scanState'))$('scanState').textContent=state}
 function tune(hz,band=null){hz=Math.round(hz);if(!safeHz(hz)){status('Fréquence hors plage 0,01–30 MHz');return false}
  if(scan){scanStop('Scan arrêté pour accord manuel')}
  if(radioConnected&&!radio.tune(hz,settings.mode)){status('Impossible d’envoyer l’accord au récepteur');return false}
@@ -42,26 +43,33 @@ function onRadioState(state,detail){liveMode=state;radioConnected=state==='audio
 function onMeter({smeter,level,frames,rate}){lastDb=level;$('frames').textContent=`${frames} trame${frames>1?'s':''} audio`;$('audioRate').textContent=`${Math.round(rate)} Hz`;$('signal').textContent=`${Math.round(smeter)} dBm`;
  const s=Math.max(0,Math.min(9,Math.round((smeter+121)/6)));$('smeter').textContent=`S ${s}`;$('meterInfo').textContent=`${Math.round(level)} dBFS · RADIO`;
  if(scan && frames>scan.lastFrames){
-   const now=Date.now(), active=Number.isFinite(level)&&level>scan.threshold;
-   scan.lastFrames=frames;
-   if(scan.state==='running' && now-scan.startAt>=650){
-     scan.hits=active?scan.hits+1:0;
-     if(scan.hits>=4){
-       scan.state='listening';clearTimeout(scan.timer);
-       scan.lastActivity=now;scan.listenStart=now;
+   const now=Date.now(), s=scan;
+   s.lastFrames=frames;
+   if(s.state==='running'){
+     // Étalonner le bruit propre à chaque fréquence avant de rechercher un signal.
+     if(now-s.startAt<850){if(Number.isFinite(level))s.noiseSamples.push(level);return}
+     if(!s.calibrated){
+       if(s.noiseSamples.length<3){s.noiseSamples.push(level);return}
+       const sorted=s.noiseSamples.filter(Number.isFinite).sort((a,b)=>a-b);
+       s.noise=sorted[Math.floor(sorted.length/2)];s.calibrated=true;
+       s.threshold=Math.min(-8,s.noise+12);
+     }
+     const active=Number.isFinite(level)&&level>s.threshold;
+     if(active){if(!s.hitSince)s.hitSince=now;if(now-s.hitSince>=650){
+       s.state='listening';clearTimeout(s.timer);s.lastActivity=now;s.listenStart=now;
        $('resumeScan').disabled=false;$('pauseScan').disabled=true;
        status(`Signal détecté sur ${format(settings.hz)} MHz · écoute en cours`);
-       $('scanInfo').textContent=`Écoute du signal · reprise automatique après 5 s de silence (max. 90 s)`;
-     }
-   }else if(scan.state==='listening'){
-     if(active)scan.lastActivity=now;
-     if(now-scan.lastActivity>=5000 || now-scan.listenStart>=90000){
-       scan.state='running';$('pauseScan').disabled=false;$('resumeScan').disabled=true;
+       $('scanInfo').textContent=`Signal supérieur au bruit de fond · reprise après 5 s sans activité (max. 90 s)`;
+       updateScanPanel('ÉCOUTE · SIGNAL');
+     }}else{s.hitSince=0}
+   }else if(s.state==='listening'){
+     if(Number.isFinite(level)&&level>s.threshold-4)s.lastActivity=now;
+     if(now-s.lastActivity>=5000 || now-s.listenStart>=90000){
+       s.state='running';$('pauseScan').disabled=false;$('resumeScan').disabled=true;
        status('Fin d’activité · reprise du balayage');scanStep();
      }
    }
  }
-
 }
 for(const b of BANDS){const button=document.createElement('button');button.textContent=b.label;button.dataset.band=b.id;button.onclick=()=>{changeMode(b.mode);tune(b.hz,b.id)};$('bands').append(button)}
 $('mode').onchange=()=>changeMode($('mode').value);
@@ -114,12 +122,12 @@ const SCAN_SETS={
 };
 function startScan(name){if(!radio.audioStarted||!radio.ws||radio.ws.readyState!==WebSocket.OPEN){status('SCAN INDISPONIBLE : attendre de vraies trames audio KiwiSDR');return}
  scanStop('Nouveau balayage');let list=name==='fr'?SCAN_SETS.fr:name==='qso'?SCAN_SETS.qso:(()=>{const b=BANDS.find(b=>b.id===settings.band)||BANDS[1];return range(b.start,b.end,2500,b.mode,b.label)})();
- scan={name,list,index:0,timer:null,state:'running',threshold:-67,lastFrames:radio.audioFrames,startAt:Date.now(),hits:0,lastActivity:0,listenStart:0};$('stopScan').disabled=false;$('pauseScan').disabled=false;$('resumeScan').disabled=true;scanStep()}
+ scan={name,list,index:0,timer:null,state:'running',threshold:-67,lastFrames:radio.audioFrames,startAt:Date.now(),hits:0,lastActivity:0,listenStart:0,noiseSamples:[],calibrated:false,hitSince:0};$('stopScan').disabled=false;$('pauseScan').disabled=false;$('resumeScan').disabled=true;scanStep()}
 function scanStep(){if(!scan||scan.state!=='running')return;const s=scan;const next=s.list[s.index%s.list.length];s.index++;
  if(!radio.tune(next.hz,next.mode)){scanStop('Scan stoppé : accord refusé');return}
- settings.hz=next.hz;settings.mode=next.mode;settings.band=BANDS.find(b=>next.hz>=b.start&&next.hz<=b.end)?.id||null;syncDisplay();s.hits=0;s.threshold=Math.max(-77,Math.min(-54,lastDb+9));s.startAt=Date.now();s.lastFrames=radio.audioFrames;status(`SCAN ${s.name.toUpperCase()} · ${format(next.hz)} MHz ${next.mode.toUpperCase()}`);$('scanInfo').textContent=`Recherche d’activité : ${next.name} · ${s.index}/${s.list.length} positions`;s.timer=setTimeout(scanStep,1800)}
+ settings.hz=next.hz;settings.mode=next.mode;settings.band=BANDS.find(b=>next.hz>=b.start&&next.hz<=b.end)?.id||null;syncDisplay();s.hits=0;s.threshold=0;s.noiseSamples=[];s.calibrated=false;s.hitSince=0;s.startAt=Date.now();s.lastFrames=radio.audioFrames;status(`SCAN ${s.name.toUpperCase()} · ${format(next.hz)} MHz ${next.mode.toUpperCase()}`);$('scanInfo').textContent=`Recherche d’activité : ${next.name} · ${s.index}/${s.list.length} positions`;updateScanPanel('BALAYAGE');s.timer=setTimeout(scanStep,2300)}
 $('scanFR').onclick=()=>startScan('fr');$('scanQSO').onclick=()=>startScan('qso');$('scanBand').onclick=()=>startScan('band');
-$('pauseScan').onclick=()=>{if(!scan||!['running','listening'].includes(scan.state))return;scan.state='paused';clearTimeout(scan.timer);$('pauseScan').disabled=true;$('resumeScan').disabled=false;status('Balayage en pause')};
+$('pauseScan').onclick=()=>{if(!scan||!['running','listening'].includes(scan.state))return;scan.state='paused';clearTimeout(scan.timer);$('pauseScan').disabled=true;$('resumeScan').disabled=false;status('Balayage en pause');updateScanPanel('PAUSE MANUELLE')};
 $('resumeScan').onclick=()=>{if(!scan||!['paused','listening'].includes(scan.state))return;scan.state='running';$('pauseScan').disabled=false;$('resumeScan').disabled=true;scanStep()};
 $('stopScan').onclick=()=>scanStop();
 function renderMemories(){const parent=$('memoryList');parent.replaceChildren();if(settings.memories.length===0){const p=document.createElement('p');p.className='subtle';p.textContent='Aucune mémoire enregistrée.';parent.appendChild(p);return}

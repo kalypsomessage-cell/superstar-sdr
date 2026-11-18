@@ -1,0 +1,1 @@
+SUPERSTAR SDR V2.4 : affichage du scan remonté sous la réception audio, fréquence et état du scan visibles ensemble. Détection adaptative avec étalonnage du bruit par fréquence, écart de 12 dB et confirmation de 650 ms. Aucun changement à kiwi-audio.js ni au relais Cloudflare. À valider en réception réelle.
