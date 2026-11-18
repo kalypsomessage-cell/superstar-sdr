@@ -7,16 +7,19 @@ const BANDS=[
 {id:'15m',label:'15 m',hz:21300000,mode:'usb',start:21200000,end:21450000},
 {id:'12m',label:'12 m',hz:24950000,mode:'usb',start:24930000,end:24990000},
 {id:'10m',label:'10 m',hz:28500000,mode:'usb',start:28300000,end:29000000}];
+const RECEIVERS=[{id:'original',label:'🌍 Récepteur actuel',url:'http://22859.proxy.kiwisdr.com:8073/'},{id:'paris',label:'🇫🇷 Paris / Yvelines · F1UBL',url:'http://f1ubl.ddns.net:8072/'},{id:'isere',label:'🇫🇷 Isère · F6ABJ',url:'http://f6abj-kiwihf.tplinkdns.com:8073/'}];
 const KEY='superstar-mobile-v1', DEFAULT='http://22859.proxy.kiwisdr.com:8073/', DEFAULT_RELAY='https://superstar-sdr-relay.kalypso-message.workers.dev';
 const $=id=>document.getElementById(id);
 const format=hz=>(hz/1e6).toFixed(5);
 const safeHz=hz=>Number.isFinite(hz)&&hz>=10000&&hz<=30000000;
-let settings={hz:7150000,mode:'lsb',band:'40m',server:DEFAULT,relay:DEFAULT_RELAY,volume:70,squelch:-105,memories:[]};
+let settings={hz:7150000,mode:'lsb',band:'40m',server:DEFAULT,relay:DEFAULT_RELAY,volume:70,squelch:-105,memories:[],scanSpeed:'normal',receiverId:'original'};
 try{const saved=JSON.parse(localStorage.getItem(KEY)||'{}');if(saved&&typeof saved==='object')settings={...settings,...saved}}catch(_){}
 if(!safeHz(settings.hz))settings.hz=7150000;
 if(!['am','lsb','usb','nbfm','nfm'].includes(settings.mode))settings.mode='lsb';
 if(!SuperstarKiwi.parseServer(settings.server))settings.server=DEFAULT;
 if(!settings.relay || !SuperstarKiwi.audioRelayUrl(settings.relay,1234))settings.relay=DEFAULT_RELAY;
+if(!['normal','fast'].includes(settings.scanSpeed))settings.scanSpeed='normal';
+if(!RECEIVERS.some(r=>r.id===settings.receiverId))settings.receiverId='original';
 if(!Array.isArray(settings.memories))settings.memories=[];
 settings.memories=settings.memories.filter(m=>safeHz(m.hz)&&['am','lsb','usb','nbfm','nfm'].includes(m.mode)).slice(0,120);
 const radio=new SuperstarKiwi.KiwiAudio({state:onRadioState,meter:onMeter,tuned:()=>{syncDisplay();},});
@@ -32,8 +35,8 @@ function syncDisplay(){
  for(const btn of $('bands').children)btn.classList.toggle('active',btn.dataset.band===settings.band);
  persist();updateScanPanel(scan?(scan.state==='running'?'BALAYAGE':scan.state==='listening'?'ÉCOUTE':'PAUSE'):'PRÊT')
 }
-function scanStop(message='Scan arrêté'){if(scan){clearTimeout(scan.timer);scan=null}for(const id of ['pauseScan','resumeScan','stopScan'])$(id).disabled=true;status(message);$('scanInfo').textContent='Détection d’activité radio, pas de reconnaissance de voix ou de langue.';updateScanPanel('ARRÊTÉ')}
-function updateScanPanel(state){if($('scanFrequency'))$('scanFrequency').textContent=format(settings.hz)+' MHz · '+settings.mode.toUpperCase();if($('scanState'))$('scanState').textContent=state}
+function scanStop(message='Scan arrêté'){if(scan){clearTimeout(scan.timer);scan=null}if($('cbScanStop'))$('cbScanStop').disabled=true;if($('cbScan'))$('cbScan').disabled=false;if($('cbScanState'))$('cbScanState').textContent='PRÊT';for(const id of ['pauseScan','resumeScan','stopScan'])$(id).disabled=true;status(message);$('scanInfo').textContent='Détection d’activité radio, pas de reconnaissance de voix ou de langue.';updateScanPanel('ARRÊTÉ')}
+function updateScanPanel(state){if($('cbScanState')&&scan&&scan.name==='cb')$('cbScanState').textContent=state;if($('scanFrequency'))$('scanFrequency').textContent=format(settings.hz)+' MHz · '+settings.mode.toUpperCase();if($('scanState'))$('scanState').textContent=state}
 function tune(hz,band=null){hz=Math.round(hz);if(!safeHz(hz)){status('Fréquence hors plage 0,01–30 MHz');return false}
  if(scan){scanStop('Scan arrêté pour réglage fin · écoute maintenue')}
  if(radioConnected&&!radio.tune(hz,settings.mode)){status('Impossible d’envoyer l’accord au récepteur');return false}
@@ -56,24 +59,24 @@ function onMeter({smeter,level,frames,rate}){
  if(s.state==='running'){
    // Un signal fort est reconnu même s'il était déjà présent au début de la mesure.
    // Un signal plus faible doit dépasser le plancher de bruit mesuré.
-   if(now-s.startAt<650){s.noiseSamples.push(smeter);return}
+   if(now-s.startAt<420){s.noiseSamples.push(smeter);return}
    if(!s.calibrated){
      const samples=s.noiseSamples.filter(Number.isFinite).sort((a,b)=>a-b);
      s.noise=samples.length?samples[Math.floor(samples.length/2)]:-120;
      s.calibrated=true;
-     s.threshold=Math.max(-108,s.noise+6);
+     s.threshold=s.name==='cb'?Math.max(-106,s.noise+5):Math.max(-108,s.noise+6);
    }
-   const strong=smeter>=-97;
+   const strong=smeter>=(s.name==='cb'?-94:-97);
    const aboveNoise=smeter>=s.threshold;
    const active=strong||aboveNoise;
    if(active){
      if(!s.hitSince)s.hitSince=now;
-     if(now-s.hitSince>=400){
+     if(now-s.hitSince>=(300)){
        s.state='listening';clearTimeout(s.timer);
        s.lastActivity=now;s.listenStart=now;
        $('resumeScan').disabled=false;$('pauseScan').disabled=true;
        status(`Activité radio sur ${format(settings.hz)} MHz · écoute en cours`);
-       $('scanInfo').textContent=`Signal ${Math.round(smeter)} dBm · reprise après 5 s sans activité (maximum 90 s)`;
+       $('scanInfo').textContent=`Signal ${Math.round(smeter)} dBm · reprise après 5 s sans activité (maximum 90 s)`;if(s.name==='cb'){$('cbInfo').textContent=`Activité radio détectée sur canal ${s.channel||cbChannel} · ${format(settings.hz)} MHz (non nécessairement une voix)`;$('cbScanState').textContent='SIGNAL DÉTECTÉ';}
        updateScanPanel('ÉCOUTE · SIGNAL');
      }
    }else{s.hitSince=0}
@@ -127,6 +130,20 @@ async function checkRelay(){
 }
 $('diag').addEventListener('click',checkRelay);
 $('server').value=settings.server;$('server').onchange=()=>{if(SuperstarKiwi.parseServer($('server').value)){settings.server=$('server').value.trim();persist()}else status('Adresse serveur invalide')};
+const rxSelect=$('receiverSelect');
+for(const item of RECEIVERS){const opt=document.createElement('option');opt.value=item.id;opt.textContent=item.label;rxSelect.append(opt)}
+function relayForReceiver(id){return DEFAULT_RELAY.replace(/\/$/,'')+(id==='original'?'':'/rx/'+id)}
+function chooseReceiver(id){const item=RECEIVERS.find(r=>r.id===id);if(!item)return;
+ if(radioConnected){radio.disconnect();scanStop('Changement de récepteur : relancez ÉCOUTER')}
+ settings.receiverId=id;settings.server=item.url;settings.relay=relayForReceiver(id);
+ $('server').value=settings.server;$('relay').value=settings.relay;radio.setRelay(settings.relay);persist();
+ $('receiverNote').textContent=id==='original'?'Récepteur historique.':'Récepteur répertorié, disponibilité audio non confirmée. Nécessite le Worker V2.9.';
+ status('Récepteur choisi : '+item.label+' · appuyez sur ÉCOUTER');}
+rxSelect.value=settings.receiverId;
+rxSelect.onchange=()=>chooseReceiver(rxSelect.value);
+if(settings.receiverId!=='original')chooseReceiver(settings.receiverId);
+$('scanSpeed').value=settings.scanSpeed;
+$('scanSpeed').onchange=()=>{settings.scanSpeed=$('scanSpeed').value;persist();status('Scan : '+(settings.scanSpeed==='fast'?'RAPIDE ×1,5':'NORMAL'))};
 $('connect').onclick=async()=>{if(!saveRelay())return;const server=SuperstarKiwi.parseServer($('server').value);if(!server){status('Adresse KiwiSDR invalide');return}settings.server=server.href;radio.setRelay(settings.relay||'');persist();scanStop('Préparation du moteur audio');$('connect').disabled=true;try{await radio.connect(settings.server,settings.hz,settings.mode)}catch(e){status('Erreur moteur audio : '+(e.message||String(e)));$('connect').disabled=false}};
 $('disconnect').onclick=()=>{radio.disconnect();scanStop('Arrêt manuel');};
 function range(start,end,step,mode,name){const out=[];for(let hz=start;hz<=end;hz+=step)out.push({hz,mode,name});return out}
@@ -134,12 +151,13 @@ const SCAN_SETS={
  fr:[...range(7100000,7200000,2500,'lsb','40 m'),...range(3650000,3700000,2500,'lsb','80 m'),...range(14125000,14300000,2500,'usb','20 m')],
  qso:[...range(3650000,3700000,2500,'lsb','80 m'),...range(18120000,18165000,2500,'usb','17 m'),...range(24930000,24990000,2500,'usb','12 m')]
 };
+function scanDuration(name){return Math.round((name==='cb'?2000:2400)/(settings.scanSpeed==='fast'?1.5:1));}
 function startScan(name){if(!radio.audioStarted||!radio.ws||radio.ws.readyState!==WebSocket.OPEN){status('SCAN INDISPONIBLE : attendre de vraies trames audio KiwiSDR');return}
  scanStop('Nouveau balayage');let list=name==='fr'?SCAN_SETS.fr:name==='qso'?SCAN_SETS.qso:(()=>{const b=BANDS.find(b=>b.id===settings.band)||BANDS[1];return range(b.start,b.end,2500,b.mode,b.label)})();
  scan={name,list,index:0,timer:null,state:'running',threshold:-108,lastFrames:radio.audioFrames,startAt:Date.now(),hits:0,lastActivity:0,listenStart:0,noiseSamples:[],calibrated:false,hitSince:0};$('stopScan').disabled=false;$('pauseScan').disabled=false;$('resumeScan').disabled=true;scanStep()}
-function scanStep(){if(!scan||scan.state!=='running')return;const s=scan;const next=s.list[s.index%s.list.length];s.index++;
+function scanStep(){if(!scan||scan.state!=='running')return;const s=scan;const next=s.list[s.index%s.list.length];s.index++;if(s.name==='cb'){s.channel=next.channel;cbChannel=next.channel;showCb();$('cbScanState').textContent='BALAYAGE';}
  if(!radio.tune(next.hz,next.mode)){scanStop('Scan stoppé : accord refusé');return}
- settings.hz=next.hz;settings.mode=next.mode;settings.band=BANDS.find(b=>next.hz>=b.start&&next.hz<=b.end)?.id||null;syncDisplay();s.hits=0;s.threshold=0;s.noiseSamples=[];s.calibrated=false;s.hitSince=0;s.startAt=Date.now();s.lastFrames=radio.audioFrames;status(`SCAN ${s.name.toUpperCase()} · ${format(next.hz)} MHz ${next.mode.toUpperCase()}`);$('scanInfo').textContent=`Recherche d’activité : ${next.name} · ${s.index}/${s.list.length} positions`;updateScanPanel('BALAYAGE');s.timer=setTimeout(scanStep,3200)}
+ settings.hz=next.hz;settings.mode=next.mode;settings.band=BANDS.find(b=>next.hz>=b.start&&next.hz<=b.end)?.id||null;syncDisplay();s.hits=0;s.threshold=0;s.noiseSamples=[];s.calibrated=false;s.hitSince=0;s.startAt=Date.now();s.lastFrames=radio.audioFrames;status(`SCAN ${s.name.toUpperCase()} · ${format(next.hz)} MHz ${next.mode.toUpperCase()}`);$('scanInfo').textContent=`Recherche d’activité : ${next.name} · ${s.index}/${s.list.length} positions`;updateScanPanel('BALAYAGE');s.timer=setTimeout(scanStep,scanDuration(s.name))}
 $('scanFR').onclick=()=>startScan('fr');$('scanQSO').onclick=()=>startScan('qso');$('scanBand').onclick=()=>startScan('band');
 $('pauseScan').onclick=()=>{if(!scan||!['running','listening'].includes(scan.state))return;scan.state='paused';clearTimeout(scan.timer);$('pauseScan').disabled=true;$('resumeScan').disabled=false;status('Balayage en pause');updateScanPanel('PAUSE MANUELLE')};
 $('resumeScan').onclick=()=>{if(!scan||!['paused','listening'].includes(scan.state))return;scan.state='running';$('pauseScan').disabled=false;$('resumeScan').disabled=true;scanStep()};
@@ -153,11 +171,28 @@ $('embed').onclick=()=>{const url=externalLink();if(!url)return;const u=new URL(
 $('closeEmbed').onclick=()=>{$('kiwiFrame').src='about:blank';$('embedView').hidden=true};
 window.addEventListener('pagehide',()=>radio.disconnect(false));
 syncDisplay();renderMemories();connection('HORS LIGNE · appuyez sur ÉCOUTER ICI');
-if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('./sw.js?v=26', {updateViaCache:'none'}).catch(()=>{});
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('./sw.js?v=28', {updateViaCache:'none'}).catch(()=>{});
 
 // V2.7 : sélecteur CB. Les 40 canaux normalisés incluent les sauts de fréquence historiques.
 const CB_FREQ_KHZ=[26965,26975,26985,27005,27015,27025,27035,27055,27065,27075,27085,27105,27115,27125,27135,27155,27165,27175,27185,27205,27215,27225,27255,27235,27245,27265,27275,27285,27295,27305,27315,27325,27335,27345,27355,27365,27375,27385,27395,27405];
 let cbChannel=19;
+function startCbScan(){
+ if(!radio.audioStarted||!radio.ws||radio.ws.readyState!==WebSocket.OPEN){status('SCAN CB : appuyez d’abord sur ÉCOUTER et attendez les trames audio');return;}
+ // La portée réelle dépend de l’antenne KiwiSDR; le scan n’est pas une reconnaissance vocale.
+ scanStop('Démarrage du scan CB');
+ const mode=$('cbMode').value;
+ const list=CB_FREQ_KHZ.map((khz,i)=>({hz:khz*1000,mode,name:'CB',channel:i+1}));
+ const startIndex=(cbChannel-1+40)%40;
+ const ordered=list.slice(startIndex).concat(list.slice(0,startIndex));
+ scan={name:'cb',list:ordered,index:0,timer:null,state:'running',threshold:-106,lastFrames:radio.audioFrames,startAt:Date.now(),hits:0,lastActivity:0,listenStart:0,noiseSamples:[],calibrated:false,hitSince:0};
+ $('cbScanStop').disabled=false;$('cbScan').disabled=true;
+ $('stopScan').disabled=false;$('pauseScan').disabled=false;$('resumeScan').disabled=true;
+ $('cbInfo').textContent='Balayage des 40 canaux · détection expérimentale des signaux';
+ scanStep();
+}
+$('cbScan').onclick=startCbScan;
+$('cbScanStop').onclick=()=>scanStop('Scan CB arrêté · écoute maintenue');
+
 function showCb(){
  const khz=CB_FREQ_KHZ[cbChannel-1];
  $('cbChannel').textContent=String(cbChannel).padStart(2,'0');
