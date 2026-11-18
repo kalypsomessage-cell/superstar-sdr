@@ -11,7 +11,7 @@ const KEY='superstar-mobile-v1', DEFAULT='http://22859.proxy.kiwisdr.com:8073/';
 const $=id=>document.getElementById(id);
 const format=hz=>(hz/1e6).toFixed(5);
 const safeHz=hz=>Number.isFinite(hz)&&hz>=10000&&hz<=30000000;
-let settings={hz:7150000,mode:'lsb',band:'40m',server:DEFAULT,relay:'',volume:70,squelch:-75,memories:[]};
+let settings={hz:7150000,mode:'lsb',band:'40m',server:DEFAULT,relay:'',volume:70,squelch:-105,memories:[]};
 try{const saved=JSON.parse(localStorage.getItem(KEY)||'{}');if(saved&&typeof saved==='object')settings={...settings,...saved}}catch(_){}
 if(!safeHz(settings.hz))settings.hz=7150000;
 if(!['am','lsb','usb','nbfm','nfm'].includes(settings.mode))settings.mode='lsb';
@@ -40,34 +40,47 @@ function tune(hz,band=null){hz=Math.round(hz);if(!safeHz(hz)){status('Fréquence
 function changeMode(mode){if(!['am','lsb','usb','nbfm'].includes(mode))return;const prev=settings.mode;settings.mode=mode;if(radioConnected&&!radio.tune(settings.hz,mode)){settings.mode=prev;status('Commande de modulation refusée');return}syncDisplay();status(`Modulation ${mode.toUpperCase()} ${radioConnected?'commandée':'préparée'}`)}
 function onRadioState(state,detail){liveMode=state;radioConnected=state==='audio'||state==='waiting'||state==='socket';if(state==='audio'){connection('AUDIO DIRECT · RÉCEPTION DE TRAMES',false,true);$('disconnect').disabled=false;status(detail)}else if(state==='connecting'||state==='socket'||state==='waiting'){connection('CONNEXION KIWI · '+detail,false,false);$('disconnect').disabled=false;status(detail)}else if(state==='error'||state==='closed'){connection('AUDIO INDISPONIBLE · '+detail,true,false);radioConnected=false;$('connect').disabled=false;$('disconnect').disabled=true;scanStop('Scan arrêté : aucune réception audio confirmée')}else{connection('HORS LIGNE · '+detail);radioConnected=false;$('disconnect').disabled=true;$('connect').disabled=false;scanStop('Scan arrêté')}
  syncDisplay();if(state==='audio')$('connect').disabled=false}
-function onMeter({smeter,level,frames,rate}){lastDb=level;$('frames').textContent=`${frames} trame${frames>1?'s':''} audio`;$('audioRate').textContent=`${Math.round(rate)} Hz`;$('signal').textContent=`${Math.round(smeter)} dBm`;
- const s=Math.max(0,Math.min(9,Math.round((smeter+121)/6)));$('smeter').textContent=`S ${s}`;$('meterInfo').textContent=`${Math.round(level)} dBFS · RADIO`;
- if(scan && frames>scan.lastFrames){
-   const now=Date.now(), s=scan;
-   s.lastFrames=frames;
-   if(s.state==='running'){
-     // Étalonner le bruit propre à chaque fréquence avant de rechercher un signal.
-     if(now-s.startAt<850){if(Number.isFinite(level))s.noiseSamples.push(level);return}
-     if(!s.calibrated){
-       if(s.noiseSamples.length<3){s.noiseSamples.push(level);return}
-       const sorted=s.noiseSamples.filter(Number.isFinite).sort((a,b)=>a-b);
-       s.noise=sorted[Math.floor(sorted.length/2)];s.calibrated=true;
-       s.threshold=Math.min(-8,s.noise+12);
-     }
-     const active=Number.isFinite(level)&&level>s.threshold;
-     if(active){if(!s.hitSince)s.hitSince=now;if(now-s.hitSince>=650){
-       s.state='listening';clearTimeout(s.timer);s.lastActivity=now;s.listenStart=now;
+function onMeter({smeter,level,frames,rate}){
+ lastDb=level;
+ $('frames').textContent=`${frames} trame${frames>1?'s':''} audio`;
+ $('audioRate').textContent=`${Math.round(rate)} Hz`;
+ $('signal').textContent=`${Math.round(smeter)} dBm`;
+ const bar=Math.max(0,Math.min(9,Math.round((smeter+121)/6)));
+ $('smeter').textContent=`S ${bar}`;
+ $('meterInfo').textContent=`${Math.round(smeter)} dBm · RADIO`;
+ if(!scan||frames<=scan.lastFrames)return;
+ const now=Date.now(),s=scan;
+ s.lastFrames=frames;
+ if(!Number.isFinite(smeter))return;
+ if(s.state==='running'){
+   // Un signal fort est reconnu même s'il était déjà présent au début de la mesure.
+   // Un signal plus faible doit dépasser le plancher de bruit mesuré.
+   if(now-s.startAt<650){s.noiseSamples.push(smeter);return}
+   if(!s.calibrated){
+     const samples=s.noiseSamples.filter(Number.isFinite).sort((a,b)=>a-b);
+     s.noise=samples.length?samples[Math.floor(samples.length/2)]:-120;
+     s.calibrated=true;
+     s.threshold=Math.max(-108,s.noise+6);
+   }
+   const strong=smeter>=-97;
+   const aboveNoise=smeter>=s.threshold;
+   const active=strong||aboveNoise;
+   if(active){
+     if(!s.hitSince)s.hitSince=now;
+     if(now-s.hitSince>=400){
+       s.state='listening';clearTimeout(s.timer);
+       s.lastActivity=now;s.listenStart=now;
        $('resumeScan').disabled=false;$('pauseScan').disabled=true;
-       status(`Signal détecté sur ${format(settings.hz)} MHz · écoute en cours`);
-       $('scanInfo').textContent=`Signal supérieur au bruit de fond · reprise après 5 s sans activité (max. 90 s)`;
+       status(`Activité radio sur ${format(settings.hz)} MHz · écoute en cours`);
+       $('scanInfo').textContent=`Signal ${Math.round(smeter)} dBm · reprise après 5 s sans activité (maximum 90 s)`;
        updateScanPanel('ÉCOUTE · SIGNAL');
-     }}else{s.hitSince=0}
-   }else if(s.state==='listening'){
-     if(Number.isFinite(level)&&level>s.threshold-4)s.lastActivity=now;
-     if(now-s.lastActivity>=5000 || now-s.listenStart>=90000){
-       s.state='running';$('pauseScan').disabled=false;$('resumeScan').disabled=true;
-       status('Fin d’activité · reprise du balayage');scanStep();
      }
+   }else{s.hitSince=0}
+ }else if(s.state==='listening'){
+   if(smeter>=Math.max(-110,s.threshold-3)||smeter>=-100)s.lastActivity=now;
+   if(now-s.lastActivity>=5000||now-s.listenStart>=90000){
+     s.state='running';$('pauseScan').disabled=false;$('resumeScan').disabled=true;
+     status('Fin d’activité · reprise du balayage');scanStep();
    }
  }
 }
@@ -79,8 +92,8 @@ $('manualFrequency').addEventListener('blur',()=>{manualEditing=false});
 $('apply').onclick=()=>{manualEditing=false;tune(Number($('manualFrequency').value.replace(',','.'))*1e6)};
 $('volume').value=settings.volume;$('volumeValue').textContent=settings.volume+' %';
 $('volume').oninput=()=>{settings.volume=Number($('volume').value);radio.setVolume(settings.volume/100);$('volumeValue').textContent=settings.volume+' %';persist()};
-$('squelch').value=settings.squelch;$('squelchValue').textContent=settings.squelch+' dBFS';
-$('squelch').oninput=()=>{settings.squelch=Number($('squelch').value);radio.setSquelch(settings.squelch);$('squelchValue').textContent=settings.squelch+' dBFS';persist()};
+if(settings.squelch<-125||settings.squelch>-65)settings.squelch=-105;$('squelch').value=settings.squelch;$('squelchValue').textContent=settings.squelch+' dBm';
+$('squelch').oninput=()=>{settings.squelch=Number($('squelch').value);radio.setSquelch(settings.squelch);$('squelchValue').textContent=settings.squelch+' dBm';persist()};
 radio.setVolume(settings.volume/100);radio.setSquelch(settings.squelch);
 $('relay').value=settings.relay||'';
 radio.setRelay(settings.relay||'');
@@ -122,10 +135,10 @@ const SCAN_SETS={
 };
 function startScan(name){if(!radio.audioStarted||!radio.ws||radio.ws.readyState!==WebSocket.OPEN){status('SCAN INDISPONIBLE : attendre de vraies trames audio KiwiSDR');return}
  scanStop('Nouveau balayage');let list=name==='fr'?SCAN_SETS.fr:name==='qso'?SCAN_SETS.qso:(()=>{const b=BANDS.find(b=>b.id===settings.band)||BANDS[1];return range(b.start,b.end,2500,b.mode,b.label)})();
- scan={name,list,index:0,timer:null,state:'running',threshold:-67,lastFrames:radio.audioFrames,startAt:Date.now(),hits:0,lastActivity:0,listenStart:0,noiseSamples:[],calibrated:false,hitSince:0};$('stopScan').disabled=false;$('pauseScan').disabled=false;$('resumeScan').disabled=true;scanStep()}
+ scan={name,list,index:0,timer:null,state:'running',threshold:-108,lastFrames:radio.audioFrames,startAt:Date.now(),hits:0,lastActivity:0,listenStart:0,noiseSamples:[],calibrated:false,hitSince:0};$('stopScan').disabled=false;$('pauseScan').disabled=false;$('resumeScan').disabled=true;scanStep()}
 function scanStep(){if(!scan||scan.state!=='running')return;const s=scan;const next=s.list[s.index%s.list.length];s.index++;
  if(!radio.tune(next.hz,next.mode)){scanStop('Scan stoppé : accord refusé');return}
- settings.hz=next.hz;settings.mode=next.mode;settings.band=BANDS.find(b=>next.hz>=b.start&&next.hz<=b.end)?.id||null;syncDisplay();s.hits=0;s.threshold=0;s.noiseSamples=[];s.calibrated=false;s.hitSince=0;s.startAt=Date.now();s.lastFrames=radio.audioFrames;status(`SCAN ${s.name.toUpperCase()} · ${format(next.hz)} MHz ${next.mode.toUpperCase()}`);$('scanInfo').textContent=`Recherche d’activité : ${next.name} · ${s.index}/${s.list.length} positions`;updateScanPanel('BALAYAGE');s.timer=setTimeout(scanStep,2300)}
+ settings.hz=next.hz;settings.mode=next.mode;settings.band=BANDS.find(b=>next.hz>=b.start&&next.hz<=b.end)?.id||null;syncDisplay();s.hits=0;s.threshold=0;s.noiseSamples=[];s.calibrated=false;s.hitSince=0;s.startAt=Date.now();s.lastFrames=radio.audioFrames;status(`SCAN ${s.name.toUpperCase()} · ${format(next.hz)} MHz ${next.mode.toUpperCase()}`);$('scanInfo').textContent=`Recherche d’activité : ${next.name} · ${s.index}/${s.list.length} positions`;updateScanPanel('BALAYAGE');s.timer=setTimeout(scanStep,3200)}
 $('scanFR').onclick=()=>startScan('fr');$('scanQSO').onclick=()=>startScan('qso');$('scanBand').onclick=()=>startScan('band');
 $('pauseScan').onclick=()=>{if(!scan||!['running','listening'].includes(scan.state))return;scan.state='paused';clearTimeout(scan.timer);$('pauseScan').disabled=true;$('resumeScan').disabled=false;status('Balayage en pause');updateScanPanel('PAUSE MANUELLE')};
 $('resumeScan').onclick=()=>{if(!scan||!['paused','listening'].includes(scan.state))return;scan.state='running';$('pauseScan').disabled=false;$('resumeScan').disabled=true;scanStep()};
@@ -139,4 +152,4 @@ $('embed').onclick=()=>{const url=externalLink();if(!url)return;const u=new URL(
 $('closeEmbed').onclick=()=>{$('kiwiFrame').src='about:blank';$('embedView').hidden=true};
 window.addEventListener('pagehide',()=>radio.disconnect(false));
 syncDisplay();renderMemories();connection('HORS LIGNE · appuyez sur ÉCOUTER ICI');
-if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('./sw.js?v=25', {updateViaCache:'none'}).catch(()=>{});

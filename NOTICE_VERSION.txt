@@ -1,0 +1,2 @@
+Version affichée : V2.5. Scripts versionnés v=25 ; service worker demandé sans cache HTTP.
+Sur iPhone, fermer et relancer l’application après publication ; si nécessaire ouvrir une fois le site dans Safari.

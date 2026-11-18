@@ -1,0 +1,6 @@
+SUPERSTAR SDR V2.5 - Test expérimental
+- Squelch désormais basé sur le niveau S-meter en dBm, pas sur le volume du bruit audio.
+- Scan : détection sur puissance S-meter avec seuil absolu et seuil relatif au bruit.
+- Durée par fréquence 3,2 secondes.
+- Connexion KiwiSDR et Cloudflare inchangée.
+Limite : un signal porteur/parasite puissant peut être pris pour une activité, et un QSO faible peut être manqué.

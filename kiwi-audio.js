@@ -15,10 +15,10 @@ function audioRelayUrl(relay,ts){if(!relay)return null;let u;try{u=new URL(relay
 function connectionCandidates(server,relay,ts){const u=parseServer(server);if(!u)return [];const choices=[];if(relay){const relayUrl=audioRelayUrl(relay,ts);if(relayUrl)choices.push({name:'Relais HTTPS privé',url:relayUrl})}if(u.port)choices.push({name:'Kiwi HTTPS 443',url:audioWsUrl(server,ts,true)});choices.push({name:'Kiwi WSS direct',url:audioWsUrl(server,ts,false)});return [...new Map(choices.map(x=>[x.url,x])).values()]}
 
 class KiwiAudio{
- constructor(callbacks={}){this.cb=callbacks;this.ws=null;this.context=null;this.volume=0.7;this.squelch=-75;this.sampleRate=12000;this.mode='lsb';this.hz=7150000;this.audioFrames=0;this.lastRms=-100;this.smeter=null;this.decoderIndex=0;this.decoderSample=0;this.started=false;this.ready=false;this.nextTime=0;this.keepalive=null;this.timeout=null;this.lastAudio=0;this.audioStarted=false;this.generation=0;this.sequence=null;this.lastState='idle';this.relay='';this.connectAttempts=[];this.attemptIndex=0;this.connectionSession=0}
+ constructor(callbacks={}){this.cb=callbacks;this.ws=null;this.context=null;this.volume=0.7;this.squelch=-105;this.sampleRate=12000;this.mode='lsb';this.hz=7150000;this.audioFrames=0;this.lastRms=-100;this.smeter=null;this.decoderIndex=0;this.decoderSample=0;this.started=false;this.ready=false;this.nextTime=0;this.keepalive=null;this.timeout=null;this.lastAudio=0;this.audioStarted=false;this.generation=0;this.sequence=null;this.lastState='idle';this.relay='';this.connectAttempts=[];this.attemptIndex=0;this.connectionSession=0}
  notify(s,detail=''){this.lastState=s;this.cb.state?.(s,detail)}
  setVolume(v){this.volume=clamp(Number(v),0,1)}
- setSquelch(v){this.squelch=clamp(Number(v),-100,0)}
+ setSquelch(v){this.squelch=clamp(Number(v),-125,-65)}
  setRelay(v){this.relay=v||''}
  async connect(server,hz,mode){this.disconnect(false);this.hz=hz;this.mode=mode;this.audioFrames=0;this.smeter=null;this.audioStarted=false;this.started=false;this.ready=false;this.lastAudio=0;this.decoderIndex=0;this.decoderSample=0;this.sequence=null;this.generation++;const id=this.generation;
   if(!parseServer(server))throw Error('Adresse du récepteur invalide');
@@ -55,7 +55,7 @@ class KiwiAudio{
   if(compressed){samples=this.decodeADPCM(payload)}else{if(payload.length%2!==0)return;samples=new Float32Array(payload.length/2);const view=new DataView(payload.buffer,payload.byteOffset,payload.byteLength);for(let i=0;i<samples.length;i++)samples[i]=view.getInt16(i*2,false)/32768}
   if(!samples.length)return;let sum=0;for(const v of samples)sum+=v*v;const rms=Math.sqrt(sum/samples.length);this.lastRms=20*Math.log10(Math.max(rms,1e-6));this.audioFrames++;this.lastAudio=Date.now();this.cb.meter?.({smeter:this.smeter,level:this.lastRms,frames:this.audioFrames,rate:this.sampleRate});
   if(!this.audioStarted){this.audioStarted=true;this.notify('audio','Trames audio KiwiSDR reçues · lecture en cours')}
-  if(this.lastRms>=this.squelch&&this.volume>0)this.play(samples)
+  if(Number.isFinite(this.smeter)&&this.smeter>=this.squelch&&this.volume>0)this.play(samples)
  }
  decodeADPCM(payload){const out=new Float32Array(payload.length*2);let j=0;for(let b of payload){for(const nib of [b&15,(b>>>4)&15]){const step=STEP_TABLE[this.decoderIndex];let diff=step>>3;if(nib&4)diff+=step;if(nib&2)diff+=step>>1;if(nib&1)diff+=step>>2;this.decoderSample=clamp(this.decoderSample+((nib&8)?-diff:diff),-32768,32767);this.decoderIndex=clamp(this.decoderIndex+INDEX_TABLE[nib&7],0,88);out[j++]=this.decoderSample/32768}}return out}
  play(samples){const ctx=this.context;if(!ctx||ctx.state==='closed')return;const now=ctx.currentTime;if(this.nextTime<now||this.nextTime>now+0.75)this.nextTime=now+0.09;const b=ctx.createBuffer(1,samples.length,this.sampleRate);b.getChannelData(0).set(samples);const src=ctx.createBufferSource();src.buffer=b;const gain=ctx.createGain();gain.gain.value=this.volume;src.connect(gain);gain.connect(ctx.destination);src.onended=()=>{src.disconnect();gain.disconnect()};src.start(this.nextTime);this.nextTime+=b.duration}
