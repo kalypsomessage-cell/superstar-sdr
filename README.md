@@ -1,11 +1,11 @@
-# SUPERSTAR SDR Mobile V2.1 — diagnostic audio sécurisé
+SUPERSTAR SDR V2.6 Silver
 
-Cette version corrige la stratégie de connexion iPhone : essaie `wss://<hôte>/ws/kiwi/.../SND` sur **443** avant le port **8073** et permet de renseigner **un relais Cloudflare Worker dédié**. Elle détecte `MSG audio_rate=` en plus de `sample_rate=` afin d'initialiser l'audio sur davantage de KiwiSDR. Le code utilise un serveur public défini et ne contourne aucune authentification.
+Interface compacte inspirée de la maquette validée. Le bandeau argenté est une image décorative; les commandes réellement interactives sont sous celui-ci.
 
-## Publication GitHub Pages
-Copiez les fichiers `index.html`, `app.js`, `kiwi-audio.js`, `style.css`, `sw.js`, `manifest.webmanifest` et `assets/` à la racine de `superstar-sdr`. **Ne publiez pas** le dossier `RELAIS_CLOUDFLARE` dans Pages (il n'y fonctionnera pas). Ce dossier sert à installer séparément un Worker Cloudflare si nécessaire. Le code navigateur conservera les mémoires précédentes (clé localStorage V1).
+Audio KiwiSDR et relais Cloudflare conservés de la V2.5 corrigée.
 
-## État de validation
-Tests automatisés locaux possibles, mais **aucune connexion réelle au KiwiSDR 22859 n'a été confirmée** depuis notre environnement. Le code 1006 sur iPhone peut aussi venir d'un refus du serveur, d'un endpoint incorrect, d'un quota, d'une session déjà pleine ou d'une incompatibilité protocolaire.
+Installer: téléverser TOUS les fichiers à la racine du dépôt GitHub Pages, notamment superstar360-silver.png.
 
-Le scanner n'est activable qu'après réception de trames SND; l'affichage de la fréquence indique une commande envoyée et non une confirmation matérielle.
+Attention: le réglage fin arrête le balayage, mais conserve la réception audio. La détection du scan reste expérimentale.
+
+V2.7 : ajout sélecteur CB 40 canaux (raccourcis 19 et 27), menu AIR informatif. La VHF aéronautique nécessite un autre récepteur SDR ; aucune réception AIR n’est simulée.

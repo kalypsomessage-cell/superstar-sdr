@@ -35,7 +35,7 @@ function syncDisplay(){
 function scanStop(message='Scan arrêté'){if(scan){clearTimeout(scan.timer);scan=null}for(const id of ['pauseScan','resumeScan','stopScan'])$(id).disabled=true;status(message);$('scanInfo').textContent='Détection d’activité radio, pas de reconnaissance de voix ou de langue.';updateScanPanel('ARRÊTÉ')}
 function updateScanPanel(state){if($('scanFrequency'))$('scanFrequency').textContent=format(settings.hz)+' MHz · '+settings.mode.toUpperCase();if($('scanState'))$('scanState').textContent=state}
 function tune(hz,band=null){hz=Math.round(hz);if(!safeHz(hz)){status('Fréquence hors plage 0,01–30 MHz');return false}
- if(scan){scanStop('Scan arrêté pour accord manuel')}
+ if(scan){scanStop('Scan arrêté pour réglage fin · écoute maintenue')}
  if(radioConnected&&!radio.tune(hz,settings.mode)){status('Impossible d’envoyer l’accord au récepteur');return false}
  settings.hz=hz;settings.band=band;syncDisplay();status(`${radioConnected?'Accord envoyé':'Accord préparé'} : ${format(hz)} MHz ${settings.mode.toUpperCase()}`);return true}
 function changeMode(mode){if(!['am','lsb','usb','nbfm'].includes(mode))return;const prev=settings.mode;settings.mode=mode;if(radioConnected&&!radio.tune(settings.hz,mode)){settings.mode=prev;status('Commande de modulation refusée');return}syncDisplay();status(`Modulation ${mode.toUpperCase()} ${radioConnected?'commandée':'préparée'}`)}
@@ -153,4 +153,25 @@ $('embed').onclick=()=>{const url=externalLink();if(!url)return;const u=new URL(
 $('closeEmbed').onclick=()=>{$('kiwiFrame').src='about:blank';$('embedView').hidden=true};
 window.addEventListener('pagehide',()=>radio.disconnect(false));
 syncDisplay();renderMemories();connection('HORS LIGNE · appuyez sur ÉCOUTER ICI');
-if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('./sw.js?v=25fix2', {updateViaCache:'none'}).catch(()=>{});
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('./sw.js?v=26', {updateViaCache:'none'}).catch(()=>{});
+
+// V2.7 : sélecteur CB. Les 40 canaux normalisés incluent les sauts de fréquence historiques.
+const CB_FREQ_KHZ=[26965,26975,26985,27005,27015,27025,27035,27055,27065,27075,27085,27105,27115,27125,27135,27155,27165,27175,27185,27205,27215,27225,27255,27235,27245,27265,27275,27285,27295,27305,27315,27325,27335,27345,27355,27365,27375,27385,27395,27405];
+let cbChannel=19;
+function showCb(){
+ const khz=CB_FREQ_KHZ[cbChannel-1];
+ $('cbChannel').textContent=String(cbChannel).padStart(2,'0');
+ $('cbFrequency').textContent=(khz/1000).toFixed(3).replace('.',',')+' MHz';
+ $('cbInfo').textContent='Canal '+cbChannel+(cbChannel===19?' · routiers':cbChannel===27?' · appel CB':'')+' · '+(khz/1000).toFixed(3).replace('.',',')+' MHz';
+}
+$('cb19').onclick=()=>{cbChannel=19;showCb();};
+$('cb27').onclick=()=>{cbChannel=27;showCb();};
+$('cbPrev').onclick=()=>{cbChannel=cbChannel===1?40:cbChannel-1;showCb();};
+$('cbNext').onclick=()=>{cbChannel=cbChannel===40?1:cbChannel+1;showCb();};
+$('cbTune').onclick=()=>{
+ const hz=CB_FREQ_KHZ[cbChannel-1]*1000,mode=$('cbMode').value;
+ // Ne pas afficher un succès de réception si le récepteur n'est pas connecté.
+ changeMode(mode);tune(hz,'cb');
+ status('CB canal '+cbChannel+' · '+format(hz)+' MHz · '+mode.toUpperCase()+(radioConnected?' · accord demandé':' · accord préparé (connectez le récepteur)'));
+};
+showCb();
