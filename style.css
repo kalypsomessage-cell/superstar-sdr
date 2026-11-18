@@ -32,3 +32,12 @@
 .radioBar{margin:6px 0}
 .radioBar .signalRow{font-size:12px}
 @media(max-width:400px){.alwaysTop .radio-art img{max-height:116px}.alwaysTop .screens{padding:5px}.pageTabs .tab{font-size:11px;padding:10px 1px}.radioBar .connection{font-size:12px}}
+
+/* V3.1 : la radio est le premier élément, sans en-tête masqué */
+html{margin:0;padding:0;scroll-padding-top:0;overscroll-behavior-y:none}
+body{margin:0;padding:0;min-height:100dvh;overscroll-behavior-y:none;background:#080e15}
+.app{padding-top:0}
+.alwaysTop{top:0;padding-top:0}
+.radio-art{margin-top:0}
+.appVersion{margin:12px 3px 4px;text-align:center;font-size:11px;color:#9fb4c6;letter-spacing:.02em}
+@media(display-mode:standalone){body{min-height:100dvh}}

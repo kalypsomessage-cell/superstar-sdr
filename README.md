@@ -1,1 +1,1 @@
-SUPERSTAR SDR V3.0 — interface à 4 pages, façade Superstar 360 persistante, récepteurs actuel et Paris.\nPublier les fichiers du dossier sur GitHub Pages. Ne pas publier worker-v29.js : le Worker V2.9 déployé reste compatible.\n
+SUPERSTAR SDR V3.1 Silver — façade directement en haut, bandeau de titre supprimé, version dans Réglages. Audio et Worker inchangés. Décompresser puis envoyer les fichiers sur GitHub Pages.
