@@ -9,3 +9,26 @@
 @media(max-width:380px){.cbControls{grid-template-columns:1fr 1fr;}.cbMain .cbReadout strong{font-size:19px}.cbMain .cbPresets button{font-size:10px}}
 
 .rxQuick,.speedQuick{display:grid;grid-template-columns:98px 1fr;gap:5px 8px;align-items:center;background:#142432;border:1px solid #527b95;border-radius:9px;padding:7px;margin-top:6px}.rxQuick label,.speedQuick label{font-size:11px;font-weight:800}.rxQuick select,.speedQuick select{min-width:0;width:100%;padding:8px 4px;border-radius:7px;background:#061724;color:white;border:1px solid #568ca5;font-size:12px}.rxQuick small,.speedQuick small{grid-column:1/-1;color:#abc4d4;font-size:10px}@media(max-width:390px){.rxQuick,.speedQuick{grid-template-columns:90px 1fr}.fine,.radioBar,.quick,.panel{padding:6px;margin-top:5px}.fine-buttons button{min-height:36px}}
+
+/* V3.0 : navigation compacte, aucune modification du moteur audio */
+.alwaysTop{position:sticky;top:0;z-index:12;background:#08131e;padding-top:2px;padding-bottom:3px;box-shadow:0 5px 14px #07111bbb}
+.alwaysTop .radio-art{margin:0 auto 5px}
+.alwaysTop .radio-art img{width:100%;max-height:145px;object-fit:contain}
+.alwaysTop .face{margin:0}
+.alwaysTop .screens{padding:7px}
+.alwaysTop .smeter,.alwaysTop .freq{padding:6px}
+.alwaysTop .freq strong{font-size:clamp(28px,7vw,44px)}
+.pageTabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;position:sticky;top:0;z-index:11;background:#091522;padding:8px 0 7px;margin:5px 0}
+.pageTabs .tab{min-width:0;padding:11px 2px;font-size:12px;font-weight:800;border-radius:9px;border:1px solid #517b95;background:#1c3041;color:#dce9f2}
+.pageTabs .tab.active{background:linear-gradient(#0874a4,#084c74);border-color:#50c8f3;color:white}
+.page[hidden]{display:none!important}
+.page{min-height:180px}
+.page>.drawer,.page>.panel,.page>.fine,.page>.quick,.page>.rxQuick,.page>.speedQuick{margin:8px 0}
+.page .flatDrawer>summary{display:none}
+.page .flatDrawer>.drawer-body{padding:0;border:0}
+.page .flatDrawer{border:0;background:transparent}
+.page .flatDrawer .panel{margin:0}
+.pageContent{min-height:180px}
+.radioBar{margin:6px 0}
+.radioBar .signalRow{font-size:12px}
+@media(max-width:400px){.alwaysTop .radio-art img{max-height:116px}.alwaysTop .screens{padding:5px}.pageTabs .tab{font-size:11px;padding:10px 1px}.radioBar .connection{font-size:12px}}

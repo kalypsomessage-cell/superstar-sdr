@@ -7,7 +7,7 @@ const BANDS=[
 {id:'15m',label:'15 m',hz:21300000,mode:'usb',start:21200000,end:21450000},
 {id:'12m',label:'12 m',hz:24950000,mode:'usb',start:24930000,end:24990000},
 {id:'10m',label:'10 m',hz:28500000,mode:'usb',start:28300000,end:29000000}];
-const RECEIVERS=[{id:'original',label:'🌍 Récepteur actuel',url:'http://22859.proxy.kiwisdr.com:8073/'},{id:'paris',label:'🇫🇷 Paris / Yvelines · F1UBL',url:'http://f1ubl.ddns.net:8072/'},{id:'isere',label:'🇫🇷 Isère · F6ABJ',url:'http://f6abj-kiwihf.tplinkdns.com:8073/'}];
+const RECEIVERS=[{id:'original',label:'🌍 Récepteur actuel',url:'http://22859.proxy.kiwisdr.com:8073/'},{id:'paris',label:'🇫🇷 Paris / Yvelines · F1UBL',url:'http://f1ubl.ddns.net:8072/'}];
 const KEY='superstar-mobile-v1', DEFAULT='http://22859.proxy.kiwisdr.com:8073/', DEFAULT_RELAY='https://superstar-sdr-relay.kalypso-message.workers.dev';
 const $=id=>document.getElementById(id);
 const format=hz=>(hz/1e6).toFixed(5);
@@ -19,7 +19,7 @@ if(!['am','lsb','usb','nbfm','nfm'].includes(settings.mode))settings.mode='lsb';
 if(!SuperstarKiwi.parseServer(settings.server))settings.server=DEFAULT;
 if(!settings.relay || !SuperstarKiwi.audioRelayUrl(settings.relay,1234))settings.relay=DEFAULT_RELAY;
 if(!['normal','fast'].includes(settings.scanSpeed))settings.scanSpeed='normal';
-if(!RECEIVERS.some(r=>r.id===settings.receiverId))settings.receiverId='original';
+if(!RECEIVERS.some(r=>r.id===settings.receiverId)){settings.receiverId='original';settings.server=DEFAULT;settings.relay=DEFAULT_RELAY;}
 if(!Array.isArray(settings.memories))settings.memories=[];
 settings.memories=settings.memories.filter(m=>safeHz(m.hz)&&['am','lsb','usb','nbfm','nfm'].includes(m.mode)).slice(0,120);
 const radio=new SuperstarKiwi.KiwiAudio({state:onRadioState,meter:onMeter,tuned:()=>{syncDisplay();},});
@@ -210,3 +210,31 @@ $('cbTune').onclick=()=>{
  status('CB canal '+cbChannel+' · '+format(hz)+' MHz · '+mode.toUpperCase()+(radioConnected?' · accord demandé':' · accord préparé (connectez le récepteur)'));
 };
 showCb();
+
+// V3.0 : navigation par panneaux. Les éléments d'origine conservent leurs IDs et leurs événements.
+(function initPages(){
+ const pages={hf:document.getElementById('page-hf'),cb:document.getElementById('page-cb'),tune:document.getElementById('page-tune'),settings:document.getElementById('page-settings')};
+ const move=(selector,page)=>{const el=document.querySelector(selector);if(el&&pages[page])pages[page].appendChild(el)};
+ move('#hfDrawer','hf');
+ move('#cbPanel','cb');
+ move('.fine','tune');
+ move('.quick','tune');
+ move('.drawer:has(#bands)','tune');
+ move('.drawer:has(#memoryList)','tune');
+ move('.rxQuick','settings');
+ move('.speedQuick','settings');
+ move('.drawer:has(#diag)','settings');
+ // Scan HF directement visible, sans clic supplémentaire.
+ const hf=document.getElementById('hfDrawer');if(hf){hf.open=true;hf.classList.add('flatDrawer');}
+ const tabs=[...document.querySelectorAll('.pageTabs .tab')];
+ function activate(page){
+  if(!pages[page])return;
+  for(const [id,pane] of Object.entries(pages)){pane.hidden=id!==page;pane.classList.toggle('active',id===page)}
+  for(const button of tabs){const selected=button.dataset.page===page;button.classList.toggle('active',selected);button.setAttribute('aria-selected',String(selected))}
+  try{sessionStorage.setItem('superstar-page',page)}catch(_){}
+  window.scrollTo({top:0,behavior:'instant'});
+ }
+ tabs.forEach(button=>button.addEventListener('click',()=>activate(button.dataset.page)));
+ let initial='hf';try{initial=sessionStorage.getItem('superstar-page')||'hf'}catch(_){}
+ activate(initial);
+})();
