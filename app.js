@@ -35,7 +35,7 @@ function syncDisplay(){
  for(const btn of $('bands').children)btn.classList.toggle('active',btn.dataset.band===settings.band);
  persist();updateScanPanel(scan?(scan.state==='running'?'BALAYAGE':scan.state==='listening'?'ÉCOUTE':'PAUSE'):'PRÊT')
 }
-function scanStop(message='Scan arrêté'){if(scan){clearTimeout(scan.timer);scan=null}if($('cbScanStop'))$('cbScanStop').disabled=true;if($('cbScan'))$('cbScan').disabled=false;if($('cbScanState'))$('cbScanState').textContent='PRÊT';for(const id of ['pauseScan','resumeScan','stopScan'])$(id).disabled=true;status(message);$('scanInfo').textContent='Détection d’activité radio, pas de reconnaissance de voix ou de langue.';updateScanPanel('ARRÊTÉ')}
+function scanStop(message='Scan arrêté'){if(scan){clearTimeout(scan.timer);scan=null}if($('cbScanStop'))$('cbScanStop').disabled=true;if($('cbScan'))$('cbScan').disabled=false;if($('cbScanState'))$('cbScanState').textContent='PRÊT';for(const id of ['pauseScan','resumeScan','stopScan'])$(id).disabled=true;status(message);$('scanInfo').textContent='';updateScanPanel('ARRÊTÉ')}
 function updateScanPanel(state){if($('cbScanState')&&scan&&scan.name==='cb')$('cbScanState').textContent=state;if($('scanFrequency'))$('scanFrequency').textContent=format(settings.hz)+' MHz · '+settings.mode.toUpperCase();if($('scanState'))$('scanState').textContent=state}
 function tune(hz,band=null){hz=Math.round(hz);if(!safeHz(hz)){status('Fréquence hors plage 0,01–30 MHz');return false}
  if(scan){scanStop('Scan arrêté pour réglage fin · écoute maintenue')}
